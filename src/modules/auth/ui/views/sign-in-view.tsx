@@ -6,14 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { OctagonAlertIcon } from "lucide-react";
 import { Alert, AlertTitle } from "@/components/ui/alert";
-
+import { Spinner } from "@/components/ui/spinner";
+import { FaGithub, FaGoogle } from "react-icons/fa";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { authClient } from "@/lib/auth-client";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 const formSchema = z.object({
@@ -21,43 +22,64 @@ const formSchema = z.object({
     password: z.string().min(1, { message: "Password is required" }),
 });
 
+
 export const SignInView = () => {
 
     const router = useRouter();
     const [error, setError] = useState<string | null>(null);
-    const [pending, setPending] = useState(false)
+    const [pending, setPending] = useState<"credentials" | "google" | "github" | null>(null);
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
             email: "",
-            password: ""
+            password: "",
         }
     })
 
     const onSubmit = (data: z.infer<typeof formSchema>) => {
         setError(null);
-        setPending(true);
+        setPending("credentials");
 
         authClient.signIn.email(
             {
                 email: data.email,
-                password: data.password
+                password: data.password,
+                callbackURL: "/",
             },
             {
                 onSuccess: () => {
-                    setPending(false);
-                    router.push("/");
+                    setPending(null);
+                    router.push("/")
                 },
                 onError: ({ error }) => {
-                    setError(error.message)
+                    setError(error.message);
+                    setPending(null);
                 }
-
             }
         )
-
     }
 
+    const onSocial = (provider: "github" | "google") => {
+        setError(null);
+        setPending(provider);
+
+        authClient.signIn.social(
+            {
+                provider: provider,
+                callbackURL: "/",
+            },
+            {
+                onSuccess: () => {
+                    setPending(null);
+                },
+                onError: ({ error }) => {
+                    setError(error.message);
+                    setPending(null);
+                }
+            }
+        )
+    }
 
     return (
         <div className="flex flex-col gap-6">
@@ -124,11 +146,12 @@ export const SignInView = () => {
                                 )}
 
                                 <Button
-                                    disabled={pending}
+                                    disabled={pending !== null}
                                     type="submit"
                                     className="w-full"
                                 >
-                                    Sign in
+                                    {pending === "credentials" && <Spinner className="mr-2" />}
+                                    {pending === "credentials" ? "Signing in..." : "Sign in"}
                                 </Button>
 
                                 <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:item-center after:border-t ">
@@ -139,21 +162,25 @@ export const SignInView = () => {
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <Button
-                                        disabled={pending}
+                                        disabled={pending !== null}
+                                        onClick={() => onSocial("google")}
                                         variant="outline"
                                         className="w-full"
                                         type="button"
                                     >
-                                        Google
+                                        {pending === "google" && <Spinner className="mr-2" />}
+                                        <FaGoogle />
                                     </Button>
 
                                     <Button
-                                        disabled={pending}
+                                        disabled={pending !== null}
+                                        onClick={() => onSocial("github")}
                                         variant="outline"
                                         className="w-full"
                                         type="button"
                                     >
-                                        Github
+                                        {pending === "github" && <Spinner className="mr-2" />}
+                                        <FaGithub />
                                     </Button>
                                 </div>
 
@@ -161,7 +188,7 @@ export const SignInView = () => {
                                     Don&apos;t have an account?{" "}
                                     <Link
                                         href="/sign-up"
-                                        className="underline underline-offset-4"
+                                        className="underline underline-offset-4 font-semibold"
                                     >
                                         Sign up
                                     </Link>
